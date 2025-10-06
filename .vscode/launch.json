@@ -7,7 +7,15 @@
         
             "version": "0.2.0",
             "configurations": [
-                
+              {
+                "name": "Attach to Edge",
+                "port": 5175,
+                "request": "attach",
+                "type": "msedge",
+                "webRoot": "${workspaceFolder}"
+              },
+              
+
               {
                 "name": "Run in Firefox",
                 "type": "firefox",

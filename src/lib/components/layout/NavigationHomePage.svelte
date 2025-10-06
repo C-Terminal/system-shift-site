@@ -76,10 +76,10 @@
 			<a
 				href="/"
 				class="font-space-grotesk text-xl font-bold tracking-tight flex items-center"
-				aria-label="The Great Canadian Exchange Homepage"
+				aria-label="System Shift Homepage"
 			>
-				<span class="text-cyber-white">The</span>
-				<span class="text-cyber- cyber-glow  text-gradient-purple ml-1">GCE</span>
+				<span class="text-cyber-white">System</span>
+				<span class="text-cyber- cyber-glow  text-gradient-purple ml-1">Shift</span>
 			</a>
 		</div>
 
