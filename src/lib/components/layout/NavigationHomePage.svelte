@@ -17,7 +17,7 @@
 
 	// Navigation links
 	const navLinks = [
-		{ name: 'Service Level Agreement', href: '/sla', id: 2 },
+		{ name: 'Service Level Agreement', href: '/servicelevelagreement', id: 2 },
 
 	];
 
@@ -120,12 +120,7 @@
 				</svg>
 			</button>
 			
-			<button 
-				class="btn btn-sm btn-primary cyber-glow" 
-				in:fade={{ duration: 300, delay: 500 }}
-			>
-				Sign In
-			</button>
+
 		</div>
 
 		<!-- Mobile Controls -->
