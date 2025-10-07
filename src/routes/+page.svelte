@@ -108,7 +108,7 @@
 				</div>
 
 				<div class="scroll-reveal cyber-box p-8 text-center">
-					<h3 class="mb-4 text-2xl font-bold text-cyber-accent">Total Customization</h3>
+					<h3 class="mb-4 text-2xl font-bold text-cyber-pulse">Total Customization</h3>
 					<p class="text-cyber-silver">
 						Tailor your OS to perfection. No more compromises—Linux bends to your workflow.
 					</p>
@@ -133,39 +133,39 @@
 				<table class="comparison-table w-full text-cyber-silver">
 					<thead>
 						<tr>
-							<th>Feature</th>
-							<th>Windows</th>
-							<th>Fedora Linux</th>
+							<th class="text-2xl">Feature</th>
+							<th class="text-2xl">Windows</th>
+							<th class="text-2xl">Fedora Linux</th>
 						</tr>
 					</thead>
 					<tbody>
 						<tr class="hover:bg-cyber-black/30">
-							<td class="font-medium text-cyber-neon">Security</td>
+							<td class="font-medium text-cyber-verify">Security</td>
 							<td>Prone to viruses, frequent patches</td>
 							<td>Immutable core, SELinux enforcement</td>
 						</tr>
 						<tr class="hover:bg-cyber-black/30">
-							<td class="font-medium text-cyber-electric">Performance</td>
+							<td class="font-medium text-cyber-verify">Performance</td>
 							<td>Resource-heavy, slows over time</td>
 							<td>Lightweight, consistent speed</td>
 						</tr>
 						<tr class="hover:bg-cyber-black/30">
-							<td class="font-medium text-cyber-accent">Cost</td>
+							<td class="font-medium text-cyber-verify">Cost</td>
 							<td>Expensive licenses</td>
 							<td>Completely free</td>
 						</tr>
 						<tr class="hover:bg-cyber-black/30">
-							<td class="font-medium text-cyber-neon">Customization</td>
+							<td class="font-medium text-cyber-verify">Customization</td>
 							<td>Limited theming</td>
 							<td>Endless tweaks & extensions</td>
 						</tr>
 						<tr class="hover:bg-cyber-black/30">
-							<td class="font-medium text-cyber-electric">Privacy</td>
+							<td class="font-medium text-cyber-verify">Privacy</td>
 							<td>Telemetry tracking</td>
 							<td>No corporate spying</td>
 						</tr>
 						<tr class="hover:bg-cyber-black/30">
-							<td class="font-medium text-cyber-accent">Support</td>
+							<td class="font-medium text-cyber-verify">Support</td>
 							<td>Paid tiers</td>
 							<td>Community + our premium service</td>
 						</tr>
@@ -207,7 +207,7 @@
 				</div>
 
 				<div class="scroll-reveal service-card cyber-box card">
-					<h3 class="mb-4 text-2xl font-bold text-cyber-accent">Security Hardening</h3>
+					<h3 class="mb-4 text-2xl font-bold text-cyber-pulse">Security Hardening</h3>
 					<p class="mb-4 text-cyber-silver">
 						Post-install fortress: firewalls, encryption, audits to lock down your system against
 						threats.
@@ -233,7 +233,7 @@
 				</div>
 
 				<div class="scroll-reveal service-card cyber-box card">
-					<h3 class="mb-4 text-2xl font-bold text-cyber-accent">Free Recovery</h3>
+					<h3 class="mb-4 text-2xl font-bold text-cyber-pulse">Free Recovery</h3>
 					<p class="mb-4 text-cyber-silver">
 						Zero-cost fixes: If anything goes wrong, our team restores your system swiftly and
 						securely.

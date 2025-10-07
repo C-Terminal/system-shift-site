@@ -65,7 +65,9 @@
 		"vitest-browser-svelte": "^1.1.0"
 	},
 	"dependencies": {
+		"@vercel/postgres": "^0.10.0",
 		"daisyui": "^5.1.27",
+		"pg": "^8.16.3",
 		"postgres": "^3.4.7"
 	}
 }

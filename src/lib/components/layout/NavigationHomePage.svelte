@@ -17,10 +17,8 @@
 
 	// Navigation links
 	const navLinks = [
-		{ name: 'Homepage', href: '/', id: 1 },
-		// { name: 'Foreign Exchange', href: '/forex', id: 2 },
-		// { name: 'Remittances', href: '/remittance', id: 3 },
-		// { name: 'Money Transfer', href: '/transfer', id: 4 }
+		{ name: 'Service Level Agreement', href: '/sla', id: 2 },
+
 	];
 
 	// Toggle menu
