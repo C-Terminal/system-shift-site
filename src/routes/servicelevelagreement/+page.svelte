@@ -1,33 +1,92 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	// import { enhance } from 'sveltekit-superforms/client';
 	import type { PageData } from './$types';
-	import type { SlaInput } from '$lib/schemas/sla';
+	import type { SlaSuccessMessage } from './+page.server';
 	import { superForm } from 'sveltekit-superforms';
 	import Agreement from '$lib/components/sla/Agreement.svelte';
+
 	export let data: PageData;
 
-	// superforms gives us a "form" object with data, errors, constraints, etc.
-	// data.form is a SuperValidated<SlaSchema>, already typed.
+	// superforms gives us a typed form object back from load/actions
 	const { form } = data;
 
-	// Local helpers
-	let formSubmitted = false;
+	// --- Local UI state ---
+	let formSubmitting = false;
 
-	const { enhance } = superForm(data.form);
+	const { enhance, message } = superForm(data.form, {
+		onSubmit: () => {
+			formSubmitting = true;
+		},
+		onError: () => {
+			formSubmitting = false;
+		},
+		onResult: () => {
+			// server action returns a (possibly fresh) form with message, errors, and cleared data
+			// superforms updates `form` for us automatically
+			formSubmitting = false;
 
-	// We keep hidden inputs bound to these (superforms will sync them).
-	// Initialize from form.data so we don't lose SSR-filled state after hydration.
+			// Keep local mirrors in sync after a successful reset:
+			// If the server returned a fresh/empty form, these will be blank.
+			clientSignature = (form.data?.clientSignature as string) ?? '';
+			providerSignature = (form.data?.providerSignature as string) ?? '';
+
+			// normalize effective date local string again
+			const v = form.data?.effectiveDate as unknown;
+			if (!v) {
+				effectiveDateStr = '';
+			} else if (typeof v === 'string') {
+				effectiveDateStr = v;
+			} else if (v instanceof Date) {
+				effectiveDateStr = toYMD(v);
+			} else {
+				try {
+					const parsed = new Date(String(v));
+					effectiveDateStr = isNaN(parsed.getTime()) ? '' : toYMD(parsed);
+				} catch {
+					effectiveDateStr = '';
+				}
+			}
+		}
+	});
+
+	// Signatures are stored as base64 data URLs; we keep local copies and also
+	// mirror them into form.data so superforms posts them.
 	let clientSignature: string = (form.data?.clientSignature as string) ?? '';
 	let providerSignature: string = (form.data?.providerSignature as string) ?? '';
 
-	// Effective date control uses YYYY-MM-DD; for min= today
-	const todayLocal = (() => {
-		const d = new Date();
+	// effectiveDate input expects YYYY-MM-DD; superforms+Zod will coerce this to Date server-side
+	function toYMD(d: Date) {
+		const y = d.getFullYear();
 		const m = String(d.getMonth() + 1).padStart(2, '0');
 		const day = String(d.getDate()).padStart(2, '0');
-		return `${d.getFullYear()}-${m}-${day}`;
+		return `${y}-${m}-${day}`;
+	}
+	const today = toYMD(new Date());
+
+	// Normalize whatever we have in form.data.effectiveDate to a string the <input type="date"> can use
+	let effectiveDateStr: string = (() => {
+		const v = form.data?.effectiveDate as unknown;
+		if (!v) return '';
+		if (typeof v === 'string') return v;
+		if (v instanceof Date) return toYMD(v);
+		// if hydration passed a serialized date string:
+		try {
+			const parsed = new Date(String(v));
+			return isNaN(parsed.getTime()) ? '' : toYMD(parsed);
+		} catch {
+			return '';
+		}
 	})();
+
+	// Keep form.data in sync when user edits date
+	function onDateInput(value: string) {
+		effectiveDateStr = value;
+		// let the schema coerce this string to Date on submit
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		(form.data as any).effectiveDate = value;
+		// clear any visible error on input
+		form.errors.effectiveDate = undefined;
+	}
 
 	// --- Signature pads ---
 	let clientCanvas: HTMLCanvasElement;
@@ -38,7 +97,6 @@
 		let drawing = false;
 
 		const resize = () => {
-			// Keep existing content? For simplicity, we clear on resize.
 			canvas.width = canvas.offsetWidth;
 			canvas.height = 200;
 			ctx.lineWidth = 2;
@@ -73,21 +131,20 @@
 		const stop = () => {
 			if (!drawing) return;
 			drawing = false;
-			const url = canvas.toDataURL();
-			onSave(url);
+			onSave(canvas.toDataURL());
 		};
 
-		// Events
+		// Mouse
 		canvas.addEventListener('mousedown', start);
 		canvas.addEventListener('mousemove', move);
 		canvas.addEventListener('mouseup', stop);
 		canvas.addEventListener('mouseleave', stop);
-
+		// Touch
 		canvas.addEventListener('touchstart', start, { passive: false });
 		canvas.addEventListener('touchmove', move, { passive: false });
 		canvas.addEventListener('touchend', stop);
 
-		// Initialize
+		// Initial + responsive sizing
 		resize();
 		const ro = new ResizeObserver(resize);
 		ro.observe(canvas);
@@ -99,7 +156,6 @@
 			canvas.removeEventListener('mousemove', move);
 			canvas.removeEventListener('mouseup', stop);
 			canvas.removeEventListener('mouseleave', stop);
-
 			canvas.removeEventListener('touchstart', start);
 			canvas.removeEventListener('touchmove', move);
 			canvas.removeEventListener('touchend', stop);
@@ -125,7 +181,7 @@
 	onMount(() => {
 		const disposeClient = setupSignaturePad(clientCanvas, (url) => {
 			clientSignature = url;
-			form.data.clientSignature = url; // keep superforms model in sync
+			form.data.clientSignature = url;
 			form.errors.clientSignature = undefined;
 		});
 		const disposeProvider = setupSignaturePad(providerCanvas, (url) => {
@@ -140,25 +196,9 @@
 		};
 	});
 
-	// Enhance submit with superforms
-	// const enhanceOptions = enhance(form, {
-	//   onSubmit: () => {
-	//     formSubmitted = true;
-	//   },
-	//   onError: () => {
-	//     formSubmitted = false;
-	//   },
-	//   onResult: () => {
-	//     // Keep button state snappy; superforms updates form with messages/errors.
-	//     formSubmitted = false;
-	//   }
-	// });
-
-	// Optional client-side guard before submit (superforms still validates)
-	function preSubmit(e: Event) {
-		// superforms will handle validation, but you can add UX checks here if needed
-		// e.g., ensure signatures aren’t blank if you disabled the inputs by mistake
-	}
+	// Type guard to render a rich message object
+	const isObjMessage = (m: unknown): m is SlaSuccessMessage =>
+		!!m && typeof m === 'object' && 'title' in m;
 </script>
 
 <svelte:head>
@@ -175,9 +215,22 @@
 				Please fill out and sign the agreement below.
 			</p>
 
-			<!-- superforms: bind this to form -->
-			<form method="POST" use:enhance on:submit={preSubmit}>
-				<!-- Hidden signature fields (kept in sync in onMount handlers) -->
+			<!-- Status message (typed SlaMsg); fall back to $page.status if you used plain strings) -->
+			{#if $message}
+				<div
+					class="mb-6 rounded border px-3 py-2"
+					class:!border-green-500={$message.status === 'success'}
+					class:!border-red-500={$message.status === 'error'}
+				>
+					{$message.text}
+					{#if $message.savedId}
+						<span class="ml-2 opacity-75">(ID: {$message.savedId})</span>
+					{/if}
+				</div>
+			{/if}
+
+			<form method="POST" use:enhance>
+				<!-- Signatures are posted as hidden fields -->
 				<input type="hidden" name="clientSignature" bind:value={clientSignature} />
 				<input type="hidden" name="providerSignature" bind:value={providerSignature} />
 
@@ -186,11 +239,12 @@
 					<input
 						type="date"
 						name="effectiveDate"
-						bind:value={form.data.effectiveDate}
-						min={todayLocal}
-						class="text-black input-bordered input w-full {form.errors.effectiveDate
+						min={today}
+						bind:value={effectiveDateStr}
+						class="input-bordered input w-full text-black {form.errors.effectiveDate
 							? 'border-cyber-alert'
 							: ''}"
+						on:input={(e) => onDateInput((e.target as HTMLInputElement).value)}
 						required
 					/>
 					{#if form.errors.effectiveDate}
@@ -203,9 +257,11 @@
 					<input
 						type="text"
 						name="clientName"
-						bind:value={form.data.clientName as SlaInput['clientName']}
-						class="text-black input-bordered input w-full {form.errors.clientName ? 'border-cyber-alert' : ''}"
-						
+						bind:value={form.data.clientName as string | undefined}
+						class="input-bordered input w-full text-black {form.errors.clientName
+							? 'border-cyber-alert'
+							: ''}"
+						on:input={() => (form.errors.clientName = undefined)}
 						required
 					/>
 					{#if form.errors.clientName}
@@ -226,11 +282,11 @@
 							<div class="text-cyber-success mt-2 text-sm">Signature captured</div>
 						{/if}
 						{#if form.errors.clientSignature}
-							<p class="error-message">{form.errors.clientSignature}</p>
+							<p class="error-message">{form.errors.clientSignature[0]}</p>
 						{/if}
-						<button type="button" class="btn mt-2 btn-sm" on:click={() => clearSignature('client')}
-							>Clear Signature</button
-						>
+						<button type="button" class="btn mt-2 btn-sm" on:click={() => clearSignature('client')}>
+							Clear Signature
+						</button>
 					</div>
 
 					<div>
@@ -250,31 +306,24 @@
 						<button
 							type="button"
 							class="btn mt-2 btn-sm"
-							on:click={() => clearSignature('provider')}>Clear Signature</button
+							on:click={() => clearSignature('provider')}
 						>
+							Clear Signature
+						</button>
 					</div>
 				</div>
-
-				<!-- Form-level message (success/failure) -->
-				{#if form.message}
-					<div class="mb-4 alert alert-info">{form.message}</div>
-				{/if}
 
 				<button
 					type="submit"
 					class="cyber-glow btn w-full btn-lg btn-primary"
-					disabled={formSubmitted}
+					disabled={formSubmitting}
 				>
-					{#if formSubmitted}
-						Submitting...
-					{:else}
-						Submit Agreement
-					{/if}
+					{#if formSubmitting}Submitting...{:else}Submit Agreement{/if}
 				</button>
 			</form>
 		</div>
 
-		<!-- Static SLA reference (unchanged content block) -->
+		<!-- Static reference block (optional) -->
 		<Agreement />
 	</div>
 </div>
@@ -282,7 +331,7 @@
 <style>
 	:global(.cyber-form) {
 		background: var(--color-cyber-charcoal);
-		border: 1px solid var(--color-cyber-blue/20);
+		border: 1px solid color-mix(in oklab, var(--color-cyber-blue), transparent 80%);
 		box-shadow: 0 0 20px rgba(14, 165, 233, 0.1);
 	}
 	.signature-pad {
