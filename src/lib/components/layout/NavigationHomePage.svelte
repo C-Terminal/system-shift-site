@@ -17,7 +17,8 @@
 
 	// Navigation links
 	const navLinks = [
-		{ name: 'Service Level Agreement', href: '/servicelevelagreement', id: 2 },
+		{ name: 'Service Level Agreement', href: '/sla', id: 2 },
+		{name: "SLA entries", href: '/sla/list', id: 3},
 
 	];
 
