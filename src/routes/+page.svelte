@@ -53,8 +53,8 @@
 <svelte:head>
     <title>System Shift - Switch to Linux Confidently</title>
     <meta
+	content="Professional migration services from Windows to Fedora Linux. Secure, customized, and supported."
         name="description"
-        content="Professional migration services from Windows to Fedora Linux. Secure, customized, and supported."
     />
 </svelte:head>
 
