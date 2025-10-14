@@ -324,7 +324,13 @@
 		</div>
 
 		<!-- Static reference block (optional) -->
-		<Agreement />
+		<div tabindex="0" class="collapse collapse-arrow bg-base-100 border-base-300 border">
+			<div class="collapse-title font-semibold text-black">Click to Review Service Level Agreement</div>
+			<div class="collapse-content text-sm">
+				<Agreement />
+			</div>
+		  </div>
+		
 	</div>
 </div>
 
