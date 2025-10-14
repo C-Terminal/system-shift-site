@@ -63,22 +63,32 @@ export const actions: Actions = {
     // Atomic UPSERT: insert (ip, windowDate) or increment count if exists.
     // Then check if the daily cap is exceeded.
     const updated = await db.transaction(async (tx) => {
-      // Try insert count=1
-      const inserted = await tx
-        .insert(rateLimits)
-        .values({ ip, windowDate, count: 1 })
-        .onConflictDoUpdate({
-          target: [rateLimits.ip, rateLimits.windowDate],
-          // increment count and bump lastAt
-          set: {
-            count: sql`${rateLimits.count} + 1`,
-            lastAt: sql`NOW()`
-          }
-        })
-        .returning({ count: rateLimits.count });
-
-      // `returning` gives the new count after upsert
-      return inserted[0];
+      // Check if record exists
+      const existing = await tx
+        .select()
+        .from(rateLimits)
+        .where(and(eq(rateLimits.ip, ip), eq(rateLimits.windowDate, windowDate)))
+        .limit(1);
+    
+      if (existing.length > 0) {
+        // Update existing
+        const [updated] = await tx
+          .update(rateLimits)
+          .set({
+            count: existing[0].count + 1,
+            lastAt: new Date()
+          })
+          .where(eq(rateLimits.id, existing[0].id))
+          .returning({ count: rateLimits.count });
+        return updated;
+      } else {
+        // Insert new
+        const [inserted] = await tx
+          .insert(rateLimits)
+          .values({ ip, windowDate, count: 1 })
+          .returning({ count: rateLimits.count });
+        return inserted;
+      }
     });
 
     if (!updated) {
