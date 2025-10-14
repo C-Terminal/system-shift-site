@@ -1,9 +1,14 @@
+// src/routes/contact/+page.server.ts
 import { superValidate, message } from 'sveltekit-superforms/server';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { contactSchema } from '$lib/schemas/contact';
 import { fail, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
+
 import nodemailer from 'nodemailer';
+import { rateLimits } from '$lib/server/db/schema';
+import { db } from '$lib/server/db/index'; // your Drizzle client
+import { and, eq, sql } from 'drizzle-orm';
 
 import {
   SMTP_HOST,
@@ -15,23 +20,16 @@ import {
   CONTACT_FROM
 } from '$env/static/private';
 
-// --- Simple in-memory rate limiter ---
-const submissions = new Map<string, { count: number; first: number }>();
 const MAX_PER_DAY = 5;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
-// --- Fastmail SMTP Transporter ---
+// Fastmail transporter
 const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
   port: Number(SMTP_PORT),
-  secure: String(SMTP_SECURE) === 'true', // true for 465 (SSL), false for 587 (STARTTLS)
-  auth: {
-    user: SMTP_USER,
-    pass: SMTP_PASS
-  }
+  secure: String(SMTP_SECURE) === 'true',
+  auth: { user: SMTP_USER, pass: SMTP_PASS }
 });
 
-// Optional: verify SMTP connectivity on boot
 transporter.verify().then(
   () => console.log('[contact] Fastmail SMTP verified'),
   (err) => console.warn('[contact] SMTP verify failed:', err?.message)
@@ -44,50 +42,63 @@ export const load: PageServerLoad = async () => {
 
 export const actions: Actions = {
   default: async ({ request, getClientAddress, url }) => {
-    // ✅ Read body ONCE
+    // Read once
     const formData = await request.formData();
 
-    // Honeypot (must be checked before validation)
+    // Honeypot
     const hp = (formData.get('company') as string | null)?.trim();
     if (hp) {
-      // Treat as spam; don't send email
-      const empty = await superValidate(zod4(contactSchema)); // return empty form to avoid reusing spam content
+      const empty = await superValidate(zod4(contactSchema));
       return fail(400, { form: empty });
     }
 
-    // Validate using the same already-read FormData
+    // Validate
     const form = await superValidate(formData, zod4(contactSchema));
-    if (!form.valid) {
-      return fail(400, { form });
-    }
+    if (!form.valid) return fail(400, { form });
 
-    // --- RATE LIMIT (5/day/IP) ---
+    // Compute UTC "day key" (YYYY-MM-DD) to avoid DST issues
+    const windowDate = new Date().toISOString().slice(0, 10); // UTC date
     const ip = getClientAddress() || 'unknown';
-    const now = Date.now();
-    const record = submissions.get(ip);
 
-    if (record) {
-      if (now - record.first > DAY_MS) {
-        submissions.set(ip, { count: 1, first: now }); // reset window
-      } else if (record.count >= MAX_PER_DAY) {
-        console.warn(`[contact] Rate limit reached for IP: ${ip}`);
-        return fail(429, {
-          form,
-          error: 'Too many submissions from this address today. Try again tomorrow.'
-        });
-      } else {
-        record.count++;
-      }
-    } else {
-      submissions.set(ip, { count: 1, first: now });
+    // Atomic UPSERT: insert (ip, windowDate) or increment count if exists.
+    // Then check if the daily cap is exceeded.
+    const updated = await db.transaction(async (tx) => {
+      // Try insert count=1
+      const inserted = await tx
+        .insert(rateLimits)
+        .values({ ip, windowDate, count: 1 })
+        .onConflictDoUpdate({
+          target: [rateLimits.ip, rateLimits.windowDate],
+          // increment count and bump lastAt
+          set: {
+            count: sql`${rateLimits.count} + 1`,
+            lastAt: sql`NOW()`
+          }
+        })
+        .returning({ count: rateLimits.count });
+
+      // `returning` gives the new count after upsert
+      return inserted[0];
+    });
+
+    if (!updated) {
+      // Shouldn't happen, but be defensive
+      return fail(500, { form, error: 'Rate limiter error. Please try again later.' });
     }
-    // --- END RATE LIMIT ---
 
+    if (updated.count > MAX_PER_DAY) {
+      // We already incremented to 6; you can optionally roll back by decrementing,
+      // but it’s fine to leave it—limit still enforces.
+      return fail(429, {
+        form,
+        error: 'Too many submissions from this address today. Try again tomorrow.'
+      });
+    }
+
+    // Build email
     const { name, email, message: bodyMsg } = form.data;
-
     const subject = `New contact from ${name}`;
     const ipInfo = `IP: ${ip}\nReferer: ${url.toString()}`;
-
     const text = `New contact form submission
 
 Name: ${name}
@@ -114,12 +125,12 @@ ${ipInfo}`;
 
     try {
       await transporter.sendMail({
-        from: CONTACT_FROM,          // Fastmail address / domain you control
-        to: CONTACT_TO,              // your inbox
+        from: CONTACT_FROM,
+        to: CONTACT_TO,
         subject,
         text,
         html,
-        replyTo: email || undefined  // so you can reply directly to the submitter
+        replyTo: email || undefined
       });
 
       return message(form, "Your message has been sent! We'll get back to you within 24 hours.");
@@ -133,7 +144,7 @@ ${ipInfo}`;
   }
 };
 
-// Escape helper to avoid HTML injection in emails
+// Escape helper
 function escapeHtml(str: string) {
   return String(str)
     .replaceAll('&', '&amp;')
